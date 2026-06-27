@@ -1,138 +1,124 @@
 #' Returns a phylo object from the argumentes generated with coalsim
-#' 
-#' @param args is a list containing vectors of coalescent times \code{coal_times}, sampling times \code{samp_times}, and number 
+#'
+#' @param args is a list containing vectors of coalescent times \code{coal_times}, sampling times \code{samp_times}, and number
 #'   sampled per sampling time \code{n_sampled}, etc. This list is the output of coalsim
-#' @return A list with two elements \code{newikck} contains the tree in phylo format, \code{lables} a vector with tip labels 
+#' @return A list with two elements \code{newikck} contains the tree in phylo format, \code{lables} a vector with tip labels
 #' @export
-#' 
+#'
 #' @examples
-#' constant<-function(x){return (rep(1,length(x)))}
-#' simulation1<-coalsim(0,10,constant)
-#' tree1<-generate_newick(simulation1)
+#' constant <- function(x) {
+#'   return(rep(1, length(x)))
+#' }
+#' simulation1 <- coalsim(0, 10, constant)
+#' tree1 <- generate_newick(simulation1)
 #' plot(tree1$newick)
-generate_newick<-function(args)
-{
-  n<-sum(args$n_sampled)
-  labels<-paste(rep("t",n),seq(1,n,1),rep("_",n),rep(args$samp_times[1],args$n_sampled[1]),sep="")
-  
-  #we could chose labels at random to coalesce but since the process is exchangeable, we don't care. At least not for now
-  tb<-args$n_sampled[1] #Total branches (initial)
-  s<-0 #time for branch lengths
-  temp_labels<-labels[1:tb]
-  temp_times<-rep(args$samp_times[1],args$n_sampled[1])
-  initial.row<-2
-  args2<-gen_INLA_args(args$samp_times,args$n_sampled,args$coal_times)
+generate_newick <- function(args) {
+  n <- sum(args$n_sampled)
+  labels <- paste(rep("t", n), seq(1, n, 1), rep("_", n), rep(args$samp_times[1], args$n_sampled[1]), sep = "")
+
+  # we could chose labels at random to coalesce but since the process is exchangeable, we don't care. At least not for now
+  tb <- args$n_sampled[1] # Total branches (initial)
+  s <- 0 # time for branch lengths
+  temp_labels <- labels[1:tb]
+  temp_times <- rep(args$samp_times[1], args$n_sampled[1])
+  initial.row <- 2
+  args2 <- gen_INLA_args(args$samp_times, args$n_sampled, args$coal_times)
   for (j in 2:length(args2$event))
   {
-    if (args2$event[j]==1)
-    {
-      s<-args2$s[j]; 
-      ra<-sample(tb,1) #choose at random one of them, the other is the one to the right so not really random
-      if (ra<tb)
-      {
-        new_label<-paste("(",temp_labels[ra],":",s-temp_times[ra],",",temp_labels[ra+1],":",s-temp_times[ra+1],")",sep="")
-        temp_labels[ra]<-new_label
-        temp_labels<-temp_labels[-(ra+1)]
-        temp_times[ra]<-s
-        temp_times<-temp_times[-(ra+1)]
+    if (args2$event[j] == 1) {
+      s <- args2$s[j]
+      ra <- sample(tb, 1) # choose at random one of them, the other is the one to the right so not really random
+      if (ra < tb) {
+        new_label <- paste("(", temp_labels[ra], ":", s - temp_times[ra], ",", temp_labels[ra + 1], ":", s - temp_times[ra + 1], ")", sep = "")
+        temp_labels[ra] <- new_label
+        temp_labels <- temp_labels[-(ra + 1)]
+        temp_times[ra] <- s
+        temp_times <- temp_times[-(ra + 1)]
+      } else {
+        new_label <- paste("(", temp_labels[ra], ":", s - temp_times[ra], ",", temp_labels[1], ":", s - temp_times[1], ")", sep = "")
+        temp_labels[1] <- new_label
+        temp_labels <- temp_labels[-(ra)]
+        temp_times[1] <- s
+        temp_times <- temp_times[-(ra)]
       }
-      else
-      {
-        new_label<-paste("(",temp_labels[ra],":",s-temp_times[ra],",",temp_labels[1],":",s-temp_times[1],")",sep="")
-        temp_labels[1]<-new_label
-        temp_labels<-temp_labels[-(ra)]
-        temp_times[1]<-s
-        temp_times<-temp_times[-(ra)]
-      }
-      tb<-tb-1
-    }
-    else
-    { #I will be adding samples at 
-      s<-args2$s[j]; 
-      if (args$n_sample[initial.row]==1)
-      {
-        temp_labels<-c(temp_labels,labels[cumsum(args$n_sampled)[initial.row]])
-        initial.row<-initial.row+1
-        tb<-tb+1
-        temp_times<-c(temp_times,s)        
-      }else{
-        end<-cumsum(args$n_sampled)[initial.row]
-        ini<-cumsum(args$n_sampled)[initial.row-1]+1
-        for (k in ini:end){
-          temp_labels<-c(temp_labels,labels[k])
-          tb<-tb+1
-          temp_times<-c(temp_times,s)      
+      tb <- tb - 1
+    } else { # I will be adding samples at
+      s <- args2$s[j]
+      if (args$n_sample[initial.row] == 1) {
+        temp_labels <- c(temp_labels, labels[cumsum(args$n_sampled)[initial.row]])
+        initial.row <- initial.row + 1
+        tb <- tb + 1
+        temp_times <- c(temp_times, s)
+      } else {
+        end <- cumsum(args$n_sampled)[initial.row]
+        ini <- cumsum(args$n_sampled)[initial.row - 1] + 1
+        for (k in ini:end) {
+          temp_labels <- c(temp_labels, labels[k])
+          tb <- tb + 1
+          temp_times <- c(temp_times, s)
         }
-        initial.row<-initial.row+1
-      }
-    }
-  }  
-  
-  out.tree<-ape::read.tree(text=paste(temp_labels,";",sep=""))
-  return(list(newick=out.tree,labels=labels))
-}
-
-generate_newick_old<-function(args,sample)
-{
-  n<-sum(sample[,1])
-  labels<-paste(rep("t",n),seq(1,n,1),rep("_",n),rep(sample[,2],sample[,1]),sep="")
-  
-  #we could chose labels at random to coalesce but since the process is exchangeable, we don't care. At least not for now
-  tb<-sample[1,1] #Total branches (initial)
-  s<-0 #time for branch lengths
-  temp_labels<-labels[1:tb]
-  temp_times<-rep(sample[1,2],sample[1,1])
-  initial.row<-2
-  for (j in 2:length(args$event))
-  {
-    if (args$event[j]==1)
-    {
-      s<-args$s[j]; 
-      ra<-sample(tb,1) #choose at random one of them, the other is the one to the right so not really random
-      if (ra<tb)
-      {
-        new_label<-paste("(",temp_labels[ra],":",s-temp_times[ra],",",temp_labels[ra+1],":",s-temp_times[ra+1],")",sep="")
-        temp_labels[ra]<-new_label
-        temp_labels<-temp_labels[-(ra+1)]
-        temp_times[ra]<-s
-        temp_times<-temp_times[-(ra+1)]
-      }
-      else
-      {
-        new_label<-paste("(",temp_labels[ra],":",s-temp_times[ra],",",temp_labels[1],":",s-temp_times[1],")",sep="")
-        temp_labels[1]<-new_label
-        temp_labels<-temp_labels[-(ra)]
-        temp_times[1]<-s
-        temp_times<-temp_times[-(ra)]
-      }
-      tb<-tb-1
-    }
-    else
-    { #I will be adding samples at 
-      s<-args$s[j]; 
-      if (sample[initial.row,1]==1)
-      {
-        temp_labels<-c(temp_labels,labels[cumsum(sample[,1])[initial.row]])
-        initial.row<-initial.row+1
-        tb<-tb+1
-        temp_times<-c(temp_times,s)        
+        initial.row <- initial.row + 1
       }
     }
   }
-  out.tree<-ape::read.tree(text=paste(temp_labels,";",sep=""))
-  return(list(newick=out.tree,labels=labels))
+
+  out.tree <- ape::read.tree(text = paste(temp_labels, ";", sep = ""))
+  return(list(newick = out.tree, labels = labels))
+}
+
+generate_newick_old <- function(args, sample) {
+  n <- sum(sample[, 1])
+  labels <- paste(rep("t", n), seq(1, n, 1), rep("_", n), rep(sample[, 2], sample[, 1]), sep = "")
+
+  # we could chose labels at random to coalesce but since the process is exchangeable, we don't care. At least not for now
+  tb <- sample[1, 1] # Total branches (initial)
+  s <- 0 # time for branch lengths
+  temp_labels <- labels[1:tb]
+  temp_times <- rep(sample[1, 2], sample[1, 1])
+  initial.row <- 2
+  for (j in 2:length(args$event))
+  {
+    if (args$event[j] == 1) {
+      s <- args$s[j]
+      ra <- sample(tb, 1) # choose at random one of them, the other is the one to the right so not really random
+      if (ra < tb) {
+        new_label <- paste("(", temp_labels[ra], ":", s - temp_times[ra], ",", temp_labels[ra + 1], ":", s - temp_times[ra + 1], ")", sep = "")
+        temp_labels[ra] <- new_label
+        temp_labels <- temp_labels[-(ra + 1)]
+        temp_times[ra] <- s
+        temp_times <- temp_times[-(ra + 1)]
+      } else {
+        new_label <- paste("(", temp_labels[ra], ":", s - temp_times[ra], ",", temp_labels[1], ":", s - temp_times[1], ")", sep = "")
+        temp_labels[1] <- new_label
+        temp_labels <- temp_labels[-(ra)]
+        temp_times[1] <- s
+        temp_times <- temp_times[-(ra)]
+      }
+      tb <- tb - 1
+    } else { # I will be adding samples at
+      s <- args$s[j]
+      if (sample[initial.row, 1] == 1) {
+        temp_labels <- c(temp_labels, labels[cumsum(sample[, 1])[initial.row]])
+        initial.row <- initial.row + 1
+        tb <- tb + 1
+        temp_times <- c(temp_times, s)
+      }
+    }
+  }
+  out.tree <- ape::read.tree(text = paste(temp_labels, ";", sep = ""))
+  return(list(newick = out.tree, labels = labels))
 }
 
 
-##Generates xml file needed to run BEAST. Note that BEAUTI doesn't allow you to generate these xml files
-#since we don't have an alignment.
-#model can take the following values
-#model= 1 is Bayesian Skyline plot with 10 change points and Exponential priors (like in the original paper)
-#model= 2 is Bayesian Skytrack
-#model =3 is Bayesian Skygrid
-#model =4 is SMC
+## Generates xml file needed to run BEAST. Note that BEAUTI doesn't allow you to generate these xml files
+# since we don't have an alignment.
+# model can take the following values
+# model= 1 is Bayesian Skyline plot with 10 change points and Exponential priors (like in the original paper)
+# model= 2 is Bayesian Skytrack
+# model =3 is Bayesian Skygrid
+# model =4 is SMC
 
-# write.xml<-function(...,file = "",model) 
+# write.xml<-function(...,file = "",model)
 # {
 #   #TODO Adapt for multiple "unlinked" trees
 #   obj <- list(...)
@@ -157,35 +143,35 @@ generate_newick_old<-function(args,sample)
 #   dates<-str_split_fixed(obj[[1]]$tip.label,"_",n=2)[,2]
 #   #The labels
 #   cat("<?xml version='1.0' standalone='yes'?>\n", file = file)
-#   cat(paste("<!--Generated by phylodyn ", date(), "-->\n\n", sep = ""), 
+#   cat(paste("<!--Generated by phylodyn ", date(), "-->\n\n", sep = ""),
 #       file = file, append = TRUE)
-#   cat(paste("<beast>\n", sep = ""), 
+#   cat(paste("<beast>\n", sep = ""),
 #       file = file, append = TRUE)
 #   N <- length(obj[[1]]$tip.label)
 #   n<-N
-#   cat(paste("<!--ntax=", N, "-->\n\n", sep = ""), 
+#   cat(paste("<!--ntax=", N, "-->\n\n", sep = ""),
 #       file = file, append = TRUE)
 #   cat("\t<taxa id='taxa'>\n", file = file, append = TRUE)
 #   for (j in 1:N)
 #   {
-#     cat(paste("\t\t<taxon id='",obj[[1]]$tip.label[j],"'>\n\t\t\t<date value='",dates[j],"' direction='backwards' units='years'/>\n\t\t</taxon>\n", sep = ""), file = file, 
+#     cat(paste("\t\t<taxon id='",obj[[1]]$tip.label[j],"'>\n\t\t\t<date value='",dates[j],"' direction='backwards' units='years'/>\n\t\t</taxon>\n", sep = ""), file = file,
 #         append = TRUE)
 #   }
 #   cat("\t</taxa>\n\n", file = file, append = TRUE)
 #   ###The tree
-# 
-#   
+#
+#
 #   for (i in 1:ntree)
 #   {
 #     ##TODO: Adjust headers when more than one tree. We will need to update it for GP-BEAST
 #     cat("<newick id='startingTree' usingDates='true' units='substitutions'>\n", file = file, append = TRUE)
-#     #if (class(obj[[i]]) != "phylo") 
+#     #if (class(obj[[i]]) != "phylo")
 #     #  next
-#     #root.tag <- if (is.rooted(obj[[i]])) 
+#     #root.tag <- if (is.rooted(obj[[i]]))
 #     #  "= [&R] "
 #     #else "= [&U] "
 #     #cat("\tTREE *", title[i], root.tag, file = file, append = TRUE)
-#     cat(write.tree(obj[[i]], file = ""), "\n", sep = "", 
+#     cat(write.tree(obj[[i]], file = ""), "\n", sep = "",
 #         file = file, append = TRUE)
 #     cat("</newick>\n\n\n", file = file, append = TRUE)
 #   }

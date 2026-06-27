@@ -1,11 +1,12 @@
-get_tips_and_times = function(tree, backwards=FALSE) {
-  root_node = tree$edge[1,1]
-  tip_labels = tree$tip.label
-  tip_times = ape::dist.nodes(tree)[root_node, 1:(root_node - 1)]
-  
-  if (backwards)
-    tip_times = max(tip_times) - tip_times
-  
+get_tips_and_times <- function(tree, backwards = FALSE) {
+  root_node <- tree$edge[1, 1]
+  tip_labels <- tree$tip.label
+  tip_times <- ape::dist.nodes(tree)[root_node, 1:(root_node - 1)]
+
+  if (backwards) {
+    tip_times <- max(tip_times) - tip_times
+  }
+
   return(data.frame(label = tip_labels, time = tip_times))
 }
 
@@ -18,39 +19,43 @@ get_tips_and_times = function(tree, backwards=FALSE) {
 #' @export
 #'
 #' @examples
-make_taxa = function(tree, units = "years") {
-  tip_times = get_tips_and_times(tree)
-  n = dim(tip_times)[1]
-  items = list()
+make_taxa <- function(tree, units = "years") {
+  tip_times <- get_tips_and_times(tree)
+  n <- dim(tip_times)[1]
+  items <- list()
   for (i in 1:n) {
-    items[[i]] = sprintf('\t\t<taxon id="%s">\n\t\t\t<date value="%f" direction="forwards" units="%s"/>\n\t\t</taxon>',
-                         tip_times[i, 1], tip_times[i, 2], units)
+    items[[i]] <- sprintf(
+      '\t\t<taxon id="%s">\n\t\t\t<date value="%f" direction="forwards" units="%s"/>\n\t\t</taxon>',
+      tip_times[i, 1], tip_times[i, 2], units
+    )
   }
-  return(paste('\t<taxa id="taxa">', paste0(items, collapse = '\n'), '\t</taxa>', sep = '\n'))
+  return(paste('\t<taxa id="taxa">', paste0(items, collapse = "\n"), "\t</taxa>", sep = "\n"))
 }
 
 #' Make alignment BEAST XML block
-#' 
-#' @param nexus_data character filename of nexus file containing the sequence 
+#'
+#' @param nexus_data character filename of nexus file containing the sequence
 #'   data to be processed.
-#'   
+#'
 #' @return a character string to be pasted into the alignment block of the BEAST
 #'   XML.
 #' @export
-#' 
+#'
 #' @examples
-make_alignment = function(nexus_data) {
-  alig = ape::read.nexus.data(nexus_data)
-  n = length(alig)
-  ids = names(alig)
-  
-  items = list()
+make_alignment <- function(nexus_data) {
+  alig <- ape::read.nexus.data(nexus_data)
+  n <- length(alig)
+  ids <- names(alig)
+
+  items <- list()
   for (i in 1:n) {
-    id = ids[i]
-    seq = paste0(alig[[i]], collapse = "")
-    seq = toupper(seq)
-    items[[i]] = sprintf('\t\t<sequence>\n\t\t\t<taxon idref="%s"/>\n\t\t\t%s\n\t\t</sequence>',
-                         id, seq)
+    id <- ids[i]
+    seq <- paste0(alig[[i]], collapse = "")
+    seq <- toupper(seq)
+    items[[i]] <- sprintf(
+      '\t\t<sequence>\n\t\t\t<taxon idref="%s"/>\n\t\t\t%s\n\t\t</sequence>',
+      id, seq
+    )
   }
-  return(paste('\t<alignment id="alignment" dataType="nucleotide">', paste0(items, collapse = '\n'), '\t</alignment>', sep = '\n'))
+  return(paste('\t<alignment id="alignment" dataType="nucleotide">', paste0(items, collapse = "\n"), "\t</alignment>", sep = "\n"))
 }
